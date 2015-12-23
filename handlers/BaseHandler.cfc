@@ -28,7 +28,7 @@ component extends="coldbox.system.EventHandler"{
 			// start a resource timer
 			var stime = getTickCount();
 			// prepare our response object
-			prc.response = getModel( "cbrestbasehandler.models.Response" );
+			prc.response = getModel( "Response@cbrestbasehandler" );
 			// prepare argument execution
 			var args = { event = arguments.event, rc = arguments.rc, prc = arguments.prc };
 			structAppend( args, arguments.eventArguments );
