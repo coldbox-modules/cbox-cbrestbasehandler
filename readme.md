@@ -1,8 +1,6 @@
 #WELCOME TO THE ColdBox Rest Base Handler Module
 
-This module provides you with several enhancements when interacting with the
-ColdFusion ORM via Hibernate.  It provides you with virtual service layers,
-active record patterns, criteria and detached criteria queries, entity compositions, populations and so much more to make your ORM life easier!
+Provides a Base Handler and Response Object to apply convention to your Rest Design
 
 ##LICENSE
 Apache License, Version 2.0.
