@@ -89,7 +89,7 @@ component extends="coldbox.system.EventHandler"{
 		// Log Locally
 		log.error( "Error in base handler (#arguments.faultAction#): #arguments.exception.message# #arguments.exception.detail#", arguments.exception );
 		// Verify response exists, else create one
-		if( !structKeyExists( prc, "response" ) ){ prc.response = getModel( "Response" ); }
+		if( !structKeyExists( prc, "response" ) ){ prc.response = getModel( "Response@cbrestbasehandler" ); }
 		// Setup General Error Response
 		prc.response
 			.setError( true )
@@ -123,7 +123,7 @@ component extends="coldbox.system.EventHandler"{
 		// Log Locally
 		log.warn( "InvalidHTTPMethod Execution of (#arguments.faultAction#): #event.getHTTPMethod()#", getHTTPRequestData() );
 		// Setup Response
-		prc.response = getModel( "Response" )
+		prc.response = getModel( "Response@cbrestbasehandler" )
 			.setError( true )
 			.setErrorCode( 405 )
 			.addMessage( "InvalidHTTPMethod Execution of (#arguments.faultAction#): #event.getHTTPMethod()#" )
