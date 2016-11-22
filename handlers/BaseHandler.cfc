@@ -64,7 +64,9 @@ component extends="coldbox.system.EventHandler"{
 		// Magical renderings
 		event.renderData( 
 			type		= prc.response.getFormat(),
-			data 		= prc.response.getDataPacket(),
+			data 		= prc.response.getFormat() == "plain" ?
+					  prc.response.getData() :
+					  prc.response.getDataPacket(),
 			contentType = prc.response.getContentType(),
 			statusCode 	= prc.response.getStatusCode(),
 			statusText 	= prc.response.getStatusText(),
