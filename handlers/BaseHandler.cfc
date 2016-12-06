@@ -29,6 +29,7 @@ component extends="coldbox.system.EventHandler"{
 			return;
 		}
 		try{
+			event.setPrivateValue( "isFirstHandlerRun", false );
 			// start a resource timer
 			var stime = getTickCount();
 			// prepare our response object
