@@ -24,6 +24,10 @@ component extends="coldbox.system.EventHandler"{
 	* Around handler for all actions it inherits
 	*/
 	function aroundHandler( event, rc, prc, targetAction, eventArguments ){
+		// Run the contents of this function block only once per request.
+		if ( event.getPrivateValue( "isFirstHandlerRun", true ) == false ) {
+			return;
+		}
 		try{
 			// start a resource timer
 			var stime = getTickCount();
