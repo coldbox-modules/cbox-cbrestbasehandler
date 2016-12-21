@@ -25,9 +25,12 @@ component extends="coldbox.system.EventHandler"{
 	*/
 	function aroundHandler( event, rc, prc, targetAction, eventArguments ){
 		// Run the contents of this function block only once per request.
-		if ( event.getPrivateValue( "isFirstHandlerRun", true ) == false ) {
-			return;
-		}
+		if
+		(
+			event.valueExists( "isFirstHandlerRun" )
+			&&
+			event.getPrivateValue( "isFirstHandlerRun", true ) == false
+		)
 		try{
 			event.setPrivateValue( "isFirstHandlerRun", false );
 			// start a resource timer
