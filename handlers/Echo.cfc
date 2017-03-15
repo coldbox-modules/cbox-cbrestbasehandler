@@ -1,7 +1,7 @@
 /**
 * My RESTFul Event Handler
 */
-component extends="BaseHandler"{
+component extends="cbrestbasehandler.handlers.BaseHandler"{
 	
 	// OPTIONAL HANDLER PROPERTIES
 	this.prehandler_only 	= "";
@@ -11,14 +11,23 @@ component extends="BaseHandler"{
 	this.aroundHandler_only = "";
 	this.aroundHandler_except = "";		
 
-	// REST Allowed HTTP Methods Ex: this.allowedMethods = {delete='POST,DELETE',index='GET'}
-	this.allowedMethods = {};
+	// REST Allowed HTTP Methods Ex:
+	// this.allowedMethods={
+	// 	'index'		= METHODS.GET ,
+	// 	'list'		= METHODS.GET,
+	// 	'get' 		= METHODS.GET,
+	// 	'create' 	= METHODS.POST,
+	// 	'update' 	= METHODS.PUT & ',' & METHODS.PATCH,
+	// 	'delete'	= METHODS.DELETE
+	// };
+
+	this.allowedMethods = {"index":METHODS.GET};
 	
 	/**
 	* Index
 	*/
 	any function index( event, rc, prc ){
-		prc.response.setData( "Welcome to my ColdBox RESTFul Service" );
+		prc.response.setData( {"echo":"Welcome to my ColdBox RESTFul Service"} );
 	}
 	
 }
