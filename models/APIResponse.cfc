@@ -3,7 +3,7 @@
 * Copyright 2005-2007 ColdBox Framework by Luis Majano and Ortus Solutions, Corp
 * www.ortussolutions.com
 * ********************************************************************************
-* HTTP Response model, spice up as needed
+* HTTP Response model, spice up as needed and stored in the request scope
 */
 component accessors="true" scope="request" {
 
@@ -25,7 +25,7 @@ component accessors="true" scope="request" {
 	/**
 	* Constructor
 	*/
-	Response function init(){
+	APIResponse function init(){
 		// Init properties
 		variables.format 			= "json";
 		variables.data 				= {};
@@ -47,9 +47,9 @@ component accessors="true" scope="request" {
 
 	/**
 	* Add some messages
-	* @param any message Array or string of message to incorporate
+	* @message Array or string of message to incorporate
 	*/
-	function addMessage( required any message ){
+	APIResponse function addMessage( required any message ){
 		if( isSimpleValue( arguments.message ) ){ arguments.message = [ arguments.message ]; }
 		variables.messages.addAll( arguments.message );
 		return this;
@@ -57,28 +57,28 @@ component accessors="true" scope="request" {
 
 	/**
 	* Add a header
-	* @param string name 	The header name ( e.g. "Content-Type" )
-	* @value string value 	The header value ( e.g. "application/json" )
+	* @name The header name ( e.g. "Content-Type" )
+	* @value The header value ( e.g. "application/json" )
 	*/
-	function addHeader( required string name, required string value ){
+	APIResponse function addHeader( required string name, required string value ){
 		arrayAppend( variables.headers, { name=arguments.name, value=arguments.value } );
 		return this;
 	}
 
 	/**
 	* Returns a standard response formatted data packet
-	* @param boolean reset 		Whether to remove the existing data marshalled from packet
+	* @reset Reset the 'data' element of the original data packet
 	*/
 	function getDataPacket( boolean reset=false ) {
-
 		var packet = {
 			"error" 		 = variables.error ? true : false,
 			"messages" 		 = variables.messages,
 			"data" 			 = variables.data
 		};
 
-		if( ARGUMENTS.reset ){
-			structDelete( packet, "data" );
+		// Are we reseting the data packet
+		if( arguments.reset ){
+			packet.data = {};
 		}
 
 		return packet;

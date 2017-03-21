@@ -1,7 +1,7 @@
 /**
 * My RESTFul Event Handler
 */
-component extends="cbrestbasehandler.handlers.BaseHandler"{
+component extends="BaseHandler"{
 	
 	// OPTIONAL HANDLER PROPERTIES
 	this.prehandler_only 	= "";
