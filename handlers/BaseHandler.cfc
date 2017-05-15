@@ -8,6 +8,38 @@
 * to produce RESTFul responses.
 */
 component extends="coldbox.system.EventHandler"{
+	// Pseudo "constants" used in API Response/Method parsing
+	property name="METHODS";
+	property name="STATUS";
+
+	// Verb aliases - in case we are dealing with legacy browsers or servers ( e.g. IIS7 default )
+	METHODS = {
+		"HEAD" 		: "HEAD",
+		"GET" 		: "GET",
+		"POST" 		: "POST",
+		"PATCH" 	: "PATCH",
+		"PUT" 		: "PUT",
+		"DELETE" 	: "DELETE"
+	};
+	
+	// HTTP STATUS CODES
+	STATUS = {
+		"CREATED" 				: 201,
+		"ACCEPTED" 				: 202,
+		"SUCCESS" 				: 200,
+		"NO_CONTENT" 			: 204,
+		"RESET" 				: 205,
+		"PARTIAL_CONTENT" 		: 206,
+		"BAD_REQUEST" 			: 400,
+		"NOT_AUTHORIZED" 		: 401,
+		"NOT_FOUND" 			: 404,
+		"NOT_ALLOWED" 			: 405,
+		"NOT_ACCEPTABLE" 		: 406,
+		"TOO_MANY_REQUESTS" 	: 429,
+		"EXPECTATION_FAILED" 	: 417,
+		"INTERNAL_ERROR" 		: 500,
+		"NOT_IMPLEMENTED" 		: 501
+	};
 
 	// OPTIONAL HANDLER PROPERTIES
 	this.prehandler_only 		= "";
@@ -17,21 +49,40 @@ component extends="coldbox.system.EventHandler"{
 	this.aroundHandler_only 	= "";
 	this.aroundHandler_except 	= "";		
 
-	// REST Allowed HTTP Methods Ex: this.allowedMethods = {delete='POST,DELETE',index='GET'}
-	this.allowedMethods = {};
-	
+	// REST Allowed HTTP Methods Ex: this.allowedMethods = {delete='#METHODS.POST#,#METHODS.DELETE#',index='#METTHOD.GET#'}
+	this.allowedMethods = {
+		"index" 	: METHODS.GET,
+		"get" 		: METHODS.GET,
+		"list" 		: METHODS.GET,
+		"update" 	: METHODS.PUT & "," & METHODS.PATCH,
+		"delete" 	: METHODS.DELETE
+	};
+
+	/**
+	* Provider for API Response Object
+	* Note: The response object is a transient, but is scoped as a "singleton" in to the request. 
+	* Do not inject this as a property or it will be come a true singleton when handler caching is enabled 
+	**/
+	package APIResponse function getAPIResponse() provider="APIResponse@cbrestbasehandler"{}
+
 	/**
 	* Around handler for all actions it inherits
 	*/
 	function aroundHandler( event, rc, prc, targetAction, eventArguments ){
+
+		//Attempt to render our target action. If it fails, provide a consistent API response
 		try{
 			// start a resource timer
 			var stime = getTickCount();
 			// prepare our response object
-			prc.response = getModel( "Response@cbrestbasehandler" );
+			prc.response = getAPIResponse();
 			// prepare argument execution
 			var args = { event = arguments.event, rc = arguments.rc, prc = arguments.prc };
 			structAppend( args, arguments.eventArguments );
+			// Incoming Format Detection
+			if( structKeyExists( rc, "format") ){
+				prc.response.setFormat( rc.format );
+			}
 			// Execute action
 			arguments.targetAction( argumentCollection=args );
 		} catch( Any e ){
@@ -40,9 +91,8 @@ component extends="coldbox.system.EventHandler"{
 			// Setup General Error Response
 			prc.response
 				.setError( true )
-				.setErrorCode( e.errorCode eq 0 ? 500 : len( e.errorCode ) ? e.errorCode : 0 )
 				.addMessage( "General application error: #e.message#" )
-				.setStatusCode( 500 )
+				.setStatusCode( STATUS.INTERNAL_ERROR )
 				.setStatusText( "General application error" );
 			// Development additions
 			if( getSetting( "environment" ) eq "development" ){
@@ -61,12 +111,17 @@ component extends="coldbox.system.EventHandler"{
 		// end timer
 		prc.response.setResponseTime( getTickCount() - stime );
 		
+		// Get response data
+		var responseData = prc.response.getDataPacket();
+		// If we have an error flag, render our messages and omit any marshalled data
+		if( prc.response.getError() ){
+			responseData = prc.response.getDataPacket( reset=true );
+		}
+
 		// Magical renderings
 		event.renderData( 
 			type		= prc.response.getFormat(),
-			data 		= prc.response.getFormat() == "plain" ?
-					  prc.response.getData() :
-					  prc.response.getDataPacket(),
+			data 		= responseData,
 			contentType = prc.response.getContentType(),
 			statusCode 	= prc.response.getStatusCode(),
 			statusText 	= prc.response.getStatusText(),
@@ -90,14 +145,15 @@ component extends="coldbox.system.EventHandler"{
 	function onError( event, rc, prc, faultAction, exception, eventArguments ){
 		// Log Locally
 		log.error( "Error in base handler (#arguments.faultAction#): #arguments.exception.message# #arguments.exception.detail#", arguments.exception );
+		
 		// Verify response exists, else create one
-		if( !structKeyExists( prc, "response" ) ){ prc.response = getModel( "Response@cbrestbasehandler" ); }
+		if( !structKeyExists( prc, "response" ) ){ prc.response = getModel( "Response" ); }
+		
 		// Setup General Error Response
 		prc.response
 			.setError( true )
-			.setErrorCode( 501 )
 			.addMessage( "Base Handler Application Error: #arguments.exception.message#" )
-			.setStatusCode( 500 )
+			.setStatusCode( STATUS.INTERNAL_ERROR )
 			.setStatusText( "General application error" );
 		
 		// Development additions
@@ -106,10 +162,10 @@ component extends="coldbox.system.EventHandler"{
 				.addMessage( "StackTrace: #arguments.exception.stacktrace#" );
 		}
 		
-		// Render Error Out
+		// Render Error Out per the conventions of our aroundHandler() error
 		event.renderData( 
 			type		= prc.response.getFormat(),
-			data 		= prc.response.getDataPacket(),
+			data 		= prc.response.getDataPacket( reset=true ),
 			contentType = prc.response.getContentType(),
 			statusCode 	= prc.response.getStatusCode(),
 			statusText 	= prc.response.getStatusText(),
@@ -125,16 +181,15 @@ component extends="coldbox.system.EventHandler"{
 		// Log Locally
 		log.warn( "InvalidHTTPMethod Execution of (#arguments.faultAction#): #event.getHTTPMethod()#", getHTTPRequestData() );
 		// Setup Response
-		prc.response = getModel( "Response@cbrestbasehandler" )
+		prc.response = getAPIResponse()
 			.setError( true )
-			.setErrorCode( 405 )
 			.addMessage( "InvalidHTTPMethod Execution of (#arguments.faultAction#): #event.getHTTPMethod()#" )
-			.setStatusCode( 405 )
+			.setStatusCode( STATUS.NOT_ALLOWED )
 			.setStatusText( "Invalid HTTP Method" );
 		// Render Error Out
 		event.renderData( 
 			type		= prc.response.getFormat(),
-			data 		= prc.response.getDataPacket(),
+			data 		= prc.response.getDataPacket( reset=true ),
 			contentType = prc.response.getContentType(),
 			statusCode 	= prc.response.getStatusCode(),
 			statusText 	= prc.response.getStatusText(),
@@ -142,5 +197,112 @@ component extends="coldbox.system.EventHandler"{
 			isBinary 	= prc.response.getBinary()
 		);
 	}
+
+	/**
+	* Invalid method execution
+	**/
+	function onMissingAction( event, rc, prc, missingAction, eventArguments ){
+		// Log Locally
+		log.warn( "Invalid HTTP Method Execution of (#arguments.missingAction#): #event.getHTTPMethod()#", getHTTPRequestData() );
+		// Setup Response
+		prc.response = getAPIResponse()
+			.setError( true )
+			.addMessage( "Action '#arguments.missingAction#' could not be found" )
+			.setStatusCode( STATUS.NOT_ALLOWED )
+			.setStatusText( "Invalid Action" );
+		// Render Error Out
+		event.renderData( 
+			type		= prc.response.getFormat(),
+			data 		= prc.response.getDataPacket( reset=true ),
+			contentType = prc.response.getContentType(),
+			statusCode 	= prc.response.getStatusCode(),
+			statusText 	= prc.response.getStatusText(),
+			location 	= prc.response.getLocation(),
+			isBinary 	= prc.response.getBinary()
+		);			
+	}
+	/**************************** RESTFUL UTILITIES ************************/
+
+
+	/**
+	* Utility methods for RESTful responses
+	**/
+
+	/**
+	* Utility function for miscellaneous 404's
+	**/
+	private function routeNotFound( event, rc, prc ){
+		
+		if( !structKeyExists( prc, "response" ) ){
+			prc.response = getAPIResponse();
+		}
+
+		prc.response.setError( true )
+			.setStatusCode( STATUS.NOT_FOUND )
+			.setStatusText( "Not Found" )
+			.addMessage( "The object requested could not be found" );
+	}
+
+	/**
+	* Utility method for when an expectation of the request failes ( e.g. an expected paramter is not provided )
+	**/
+	private function onExpectationFailed( 
+		event 	= getRequestContext(), 
+		rc 		= getRequestCollection(),
+		prc 	= getRequestCollection( private=true ) 
+	){
+		if( !structKeyExists( prc, "response" ) ){
+			prc.response = getAPIResponse();
+		}
+
+		prc.response.setError( true )
+			.setStatusCode( STATUS.EXPECTATION_FAILED )
+			.setStatusText( "Expectation Failed" )
+			.addMessage( "An expectation for the request failed. Could not proceed" );		
+	}
+
+	/**
+	* Utility method to render a failure of authorization on any resource
+	**/
+	private function onAuthorizationFailure( 
+		event 	= getRequestContext(), 
+		rc 		= getRequestCollection(),
+		prc 	= getRequestCollection( private=true ),
+		abort 	= false 
+	){
+		if( !structKeyExists( prc, "response" ) ){
+			prc.response = getModel( "Response" );
+		}
+
+		log.warn( "Authorization Failure", getHTTPRequestData() );
+
+		prc.response.setError( true )
+			.setStatusCode( STATUS.NOT_AUTHORIZED )
+			.setStatusText( "Unauthorized Resource" )
+			.addMessage( "Your permissions do not allow this operation" );
+
+		/**
+		* When you need a really hard stop to prevent further execution ( use as last resort )
+		**/
+		if( arguments.abort ){
+
+			event.setHTTPHeader( 
+				name 	= "Content-Type",
+	        	value 	= "application/json"
+			);
+
+			event.setHTTPHeader( 
+				statusCode = "#STATUS.NOT_AUTHORIZED#",
+	        	statusText = "Not Authorized"
+			);
+			
+			writeOutput( 
+				serializeJSON( prc.response.getDataPacket( reset=true ) ) 
+			);
+			flush;
+			abort;
+		}
+	}
+
 
 }
